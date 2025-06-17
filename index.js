@@ -51,9 +51,6 @@ const commands = [
         .setDescription('Song name or URL')
         .setRequired(true)),
   new SlashCommandBuilder()
-    .setName('czarny')
-    .setDescription('Odtwarza specjalną piosenkę'),
-  new SlashCommandBuilder()
     .setName('pause')
     .setDescription('Pause the current song'),
   new SlashCommandBuilder()
@@ -137,122 +134,11 @@ const commands = [
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
 
-require('dotenv').config();
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ActivityType, StringSelectMenuBuilder } = require('discord.js');
-
-const express = require('express');
-const app = express();
-const port = 3000;
-
-app.get('/', (req, res) => {
-  res.send('Discord Music Bot is running!');
-});
-
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Express server running on port ${port}`);
-});
-
-const { Manager } = require('erela.js');
-
-const nodes = [{
-  host: 'lava-v3.ajieblogs.eu.org',
-  port: 80,
-  password: 'https://dsc.gg/ajidevserver',
-  secure: false,
-}];
-
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildVoiceStates,
-  ],
-});
-
-const manager = new Manager({
-  nodes,
-  send(id, payload) {
-    const guild = client.guilds.cache.get(id);
-    if (guild) guild.shard.send(payload);
-  },
-  defaultSearchPlatform: 'youtube',
-  autoPlay: true,
-  clientName: `${client.user?.username || 'Music Bot'}`,
-  plugins: []
-});
-
-const commands = [
-  new SlashCommandBuilder()
-    .setName('play')
-    .setDescription('Plays a song')
-    .addStringOption(option => 
-      option.setName('query')
-        .setDescription('Song name or URL')
-        .setRequired(true)),
-  new SlashCommandBuilder()
-    .setName('czarny')
-    .setDescription('Odtwarza specjalną piosenkę'),
-  new SlashCommandBuilder()
-    .setName('pause')
-    .setDescription('Pause the current song'),
-  // ... (reszta komend pozostaje bez zmian)
-].map(command => command.toJSON());
-
-const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
-
-// Dodaj tę funkcję przed client.once('ready')
-async function playCzarny(interaction) {
-  await interaction.deferReply();
-  
-  const voiceChannel = interaction.member.voice.channel;
-  if (!voiceChannel) {
-    return interaction.editReply('❌ **Musisz być na kanale głosowym!**');
-  }
-
-  const player = manager.players.get(interaction.guild.id) || manager.create({
-    guild: interaction.guild.id,
-    voiceChannel: voiceChannel.id,
-    textChannel: interaction.channel.id,
-  });
-
-  if (player.state !== "CONNECTED") {
-    player.connect();
-    player.setVolume(50);
-  }
-
-  try {
-    const url = 'https://www.youtube.com/watch?v=SNivSAZUcOM';
-    const res = await manager.search(url, interaction.user);
-    
-    if (res.loadType !== 'TRACK_LOADED') {
-      return interaction.editReply('❌ **Nie udało się załadować utworu!**');
-    }
-
-    const track = res.tracks[0];
-    player.queue.add(track);
-
-    if (!player.playing && !player.paused) {
-      player.play();
-    }
-
-    interaction.editReply({
-      embeds: [
-        new EmbedBuilder()
-          .setDescription(`🎶 **Dodano do kolejki:** [${track.title}](${track.uri})`)
-          .setThumbnail(track.thumbnail)
-          .setColor('#FF0000')
-      ]
-    });
-  } catch (error) {
-    console.error(error);
-    interaction.editReply('🔥 **Wystąpił błąd podczas odtwarzania!**');
-  }
-}
-
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}`);
   manager.init(client.user.id);
 
-  client.user.setActivity('/help | https://github.com/Unknownzop/MusicBot', { type: ActivityType.Listening });
+  client.user.setActivity('/help', { type: ActivityType.Listening });
 
   try {
     console.log('Refreshing slash commands...');
@@ -391,7 +277,7 @@ client.on('interactionCreate', async (interaction) => {
     }
     return;
   }
-  
+
   if (interaction.isStringSelectMenu() && interaction.customId === 'filter') {
     const player = manager.players.get(interaction.guild.id);
     if (!player) return;
@@ -417,9 +303,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   const { commandName, options } = interaction;
-  if (interaction.isCommand() && interaction.commandName === 'czarny') {
-    await playCzarny(interaction);
-  }
+
   if (commandName === 'play') {
     if (!interaction.member.voice.channel) {
       return interaction.reply({ content: 'Join a voice channel first!', ephemeral: true });
@@ -493,7 +377,7 @@ client.on('interactionCreate', async (interaction) => {
       .setTimestamp();
     await interaction.reply({ embeds: [embed] });
   }
-  
+
   if (commandName === 'skip') {
     const player = manager.players.get(interaction.guild.id);
     if (!player) return interaction.reply({ content: 'Not playing anything!', ephemeral: true });
